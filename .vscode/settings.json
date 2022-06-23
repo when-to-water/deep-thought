@@ -12,6 +12,6 @@
       "python.linting.banditEnabled": true,
       "python.linting.flake8Enabled": true,
       "python.linting.flake8Args": [
-        "--ignore=E501"
+        "--ignore=E501,W503"
       ]
 }
