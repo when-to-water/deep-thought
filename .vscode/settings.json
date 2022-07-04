@@ -13,5 +13,8 @@
       "python.linting.flake8Enabled": true,
       "python.linting.flake8Args": [
         "--ignore=E501,W503"
-      ]
+      ],
+      "yaml.schemas": {
+        "https://json.schemastore.org/github-workflow.json": "file:///home/schnurbe/repos/private/when-to-water/deep-thought/.github/workflows/deploy.yml"
+      }
 }
