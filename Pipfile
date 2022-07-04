@@ -8,13 +8,13 @@ python-dotenv = "*"
 pandas = "*"
 awswrangler = "*"
 scipy = "*"
+aws-lambda-typing = "*"
 
 [dev-packages]
 black = "*"
 mypy = "*"
 bandit = "*"
 flake8 = "*"
-aws-lambda-typing = "*"
 
 [requires]
 python_version = "3.9"
