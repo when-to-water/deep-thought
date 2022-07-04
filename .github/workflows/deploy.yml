@@ -1,0 +1,57 @@
+name: Deploy to AWS Lambda
+
+on:
+  push:
+    branches: ["main", "deploy"]
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+          cache: "pip"
+          # dependencies are define in Pipfile.lock but pip is used to package for AWS. Thus `requirement.txt` will be generated on the fly and is not available for the cache hash
+          cache-dependency-path: Pipfile.lock
+
+      - name: Install pipenv
+        run: pipx install pipenv
+
+      - name: Bundle packages
+        run: |
+          pipenv requirements > requirements.txt
+          pipenv run pip install -r requirements.txt --target _build/
+          cd _build
+          zip -r9 package.zip *
+          cd ..
+          mv _build/package.zip ./
+          zip -g package.zip main.py
+
+      - name: Upload bundle
+        uses: actions/upload-artifact@v3.1.0
+        with:
+          name: lambda_package
+          path: package.zip
+          if-no-files-found: error
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: package
+    steps:
+      - name: Download a Build Artifact
+        uses: actions/download-artifact@v3.0.0
+        with:
+          name: lambda_package
+      - name: Set AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: Update Lambda
+        run: echo WIP
