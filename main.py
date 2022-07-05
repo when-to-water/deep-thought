@@ -1,12 +1,12 @@
 import datetime
 import json
 import logging
-import sys
 from typing import Any
 
 import awswrangler as wr
 import pandas as pd
 import scipy.signal as signal
+from aws_lambda_typing import context as context_, events
 from dotenv import load_dotenv
 from numpy.polynomial import Polynomial
 
@@ -24,18 +24,27 @@ PLANTS: tuple[str, ...] = tuple(SENSOR_PLANT_MAPPING.values())
 DISTANCE = 3
 PROMINENCE = 2
 
-input_args = '{"Goldfruchtpalme": 50, "Pilea":30, "Drachenbaum": 20 }'
 
+def lambda_handler(
+    event: events.APIGatewayProxyEventV2, context: context_.Context
+) -> dict[str, Any]:
 
-def main() -> None:
+    body: str = ""
+    if event.get("body") is None:
+        return generate_exit_error(400, "No body in request", context.aws_request_id)
+    else:
+        body = event["body"]
+
     try:
-        min_moistures = prep_input(json.loads(input_args))
+        min_moistures = prep_input(json.loads(body))
     except json.JSONDecodeError:
-        logging.critical("Input was not well-formed JSON!")
-        sys.exit(1)
+        return generate_exit_error(
+            406, "Input was not well-formed JSON!", context.aws_request_id
+        )
     except Exception as e:
-        logging.critical(f"Error while parsing input: {e}")
-        sys.exit(1)
+        return generate_exit_error(
+            400, f"Error while parsing input: {e}", context.aws_request_id
+        )
 
     wanted_plants = tuple(min_moistures.keys())
 
@@ -77,7 +86,8 @@ def main() -> None:
     for plant in wanted_plants:
         return_dict[plant] = {
             "last_measuring": {
-                "time": (newest_times[plant] - pd.Timestamp("1970-01-01")) // pd.Timedelta('1s'),  # recommended by pandas
+                "time": (newest_times[plant] - pd.Timestamp("1970-01-01"))
+                // pd.Timedelta("1s"),  # recommended by pandas
                 "value": newest_moistures[plant],
             },
             "next_watering": next_watering[plant],
@@ -87,6 +97,24 @@ def main() -> None:
     return_json = json.dumps(return_dict)
 
     logging.info(f"Returning '{return_json}'")
+
+    return {
+        "statusCode": 200,
+        "headers": {"Content-Type": "application/json"},
+        "body": return_json,
+    }
+
+
+def generate_exit_error(code: int, message: str, awsRequestId: str) -> dict[str, Any]:
+    logging.critical(message)
+    return {
+        "errorMessage": {
+            "errorType": "CRITICAL",
+            "errorMessage": message,
+            "httpStatus": code,
+            "requestId": awsRequestId,
+        }
+    }
 
 
 def sensor_name_by_plant(wanted_plant: str) -> str:
@@ -237,15 +265,13 @@ def prep_input(input_dict: dict[str, int]) -> dict[str, int]:
 
     for key in input_dict.keys():
         if key not in PLANTS:
-            logging.critical(f'"{key}" is not a plant we know.')
-            sys.exit(1)
+            raise (ValueError(f'"{key}" is not a plant we know.'))
 
     for value in input_dict.values():
         if not (1 <= value <= 100):
-            logging.critical(
-                f'Minimum moisture of "{value}" % is not allowed for {key}.'
+            raise (
+                ValueError(f'Minimum moisture of "{value}" % is not allowed for {key}.')
             )
-            sys.exit(1)
 
     return input_dict
 
@@ -282,7 +308,3 @@ def get_last_week_moistures(
             df[df["plant"] == plant]["soil moisture in %"]
         )
     return last_week_moistures
-
-
-if __name__ == "__main__":
-    main()

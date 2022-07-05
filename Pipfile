@@ -8,6 +8,7 @@ python-dotenv = "*"
 pandas = "*"
 awswrangler = "*"
 scipy = "*"
+aws-lambda-typing = "*"
 
 [dev-packages]
 black = "*"
