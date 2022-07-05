@@ -29,11 +29,11 @@ def lambda_handler(
     event: events.APIGatewayProxyEventV2, context: context_.Context
 ) -> dict[str, Any]:
 
-    body: str = ""
-    if event.get("body") is None:
+    body = event.get("body")
+    if body is None:
         return generate_exit_error(400, "No body in request", context.aws_request_id)
     else:
-        body = event["body"]
+        assert isinstance(body, str)  # nosec: B101
 
     try:
         min_moistures = prep_input(json.loads(body))
@@ -71,7 +71,7 @@ def lambda_handler(
 
     df = remove_ascends(df)
 
-    polyfits: dict[str, Polynomial] = fit(df)
+    polyfits: dict[str, Polynomial] = fit(df, wanted_plants)
 
     next_watering: dict[str, tuple[float, float]] = calc_next_watering(
         min_moistures, newest_moistures, polyfits, newest_times
@@ -174,7 +174,6 @@ def identify_valleys_peaks(
 
     all_peaks: list = []
     all_valleys: list = []
-    last_extreme_peak: dict = {}
 
     for plant in PLANTS:
         df_plant = df[df["plant"] == plant]
@@ -189,12 +188,8 @@ def identify_valleys_peaks(
             prominence=PROMINENCE,
         )[0]
         # translate row to index
-        all_peaks += list([df_plant.index[peak] for peak in peaks])
-        all_valleys += list([df_plant.index[valley] for valley in valleys])
-
-        last_extreme_peak[plant] = max(all_peaks) > max(all_valleys)
-        if last_extreme_peak:
-            all_valleys += list(df_plant.index[df_plant["time"] == newest_times[plant]])
+        all_peaks += [df_plant.index[peak] for peak in peaks]
+        all_valleys += [df_plant.index[valley] for valley in valleys]
 
     df["peak"] = df.index.isin(all_peaks)
     df["valley"] = df.index.isin(all_valleys)
@@ -247,9 +242,9 @@ def remove_ascends(df: pd.DataFrame) -> pd.DataFrame:
     return pd.concat(decending_dfs)
 
 
-def fit(df: pd.DataFrame) -> dict[str, Polynomial]:
+def fit(df: pd.DataFrame, wanted_plants: tuple[str, ...]) -> dict[str, Polynomial]:
     polyfits: dict = {}
-    for plant in PLANTS:
+    for plant in wanted_plants:
         polyfits[plant] = Polynomial.fit(  # type: ignore
             df[df["plant"] == plant]["offset"],
             df[df["plant"] == plant]["soil moisture in %"],
@@ -302,7 +297,7 @@ def get_last_week_moistures(
     df = df.copy()
     df = df[df["time"] > datetime.datetime.now() - datetime.timedelta(days=7)]
     df.set_index("time", inplace=True)
-    df = df.groupby(["plant"]).resample("D").median().reset_index()
+    df = df.groupby(["plant"]).resample("D").median()
     for plant in wanted_plants:
         last_week_moistures[plant] = tuple(
             df[df["plant"] == plant]["soil moisture in %"]
