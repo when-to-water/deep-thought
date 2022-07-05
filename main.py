@@ -24,14 +24,19 @@ PLANTS: tuple[str, ...] = tuple(SENSOR_PLANT_MAPPING.values())
 DISTANCE = 3
 PROMINENCE = 2
 
-input_args = '{"Goldfruchtpalme": 50, "Pilea": 30, "Drachenbaum": 20 }'
-
 
 def lambda_handler(
     event: events.APIGatewayProxyEventV2, context: context_.Context
 ) -> dict[str, Any]:
+
+    body: str = ""
+    if event.get("body") is None:
+        return generate_exit_error(400, "No body in request", context.aws_request_id)
+    else:
+        body = event["body"]
+
     try:
-        min_moistures = prep_input(json.loads(input_args))
+        min_moistures = prep_input(json.loads(body))
     except json.JSONDecodeError:
         return generate_exit_error(
             406, "Input was not well-formed JSON!", context.aws_request_id
