@@ -2,9 +2,7 @@ name: Deploy AWS Layer
 
 on:
   push:
-    branches: ["main", "deploy"]
-    #paths:
-    #  - 'Pipfile.lock'
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
