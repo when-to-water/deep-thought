@@ -52,10 +52,15 @@ def lambda_handler(
         "','".join([sensor_name_by_plant(plant) for plant in wanted_plants])
     )
 
-    df: pd.DataFrame = wr.timestream.query(
-        f'SELECT * FROM "when-to-water"."sensor-data" WHERE "sensor_name" in ({sensor_filter})'  # nosec: query is safe. awswrangler does not allow query parameters.
-    )
-    logging.info(f"Retrieved {len(df)} records")
+    try:
+        df: pd.DataFrame = wr.timestream.query(
+            f'SELECT * FROM "when-to-water"."sensor-data" WHERE "sensor_name" in ({sensor_filter})'  # nosec: query is safe. awswrangler does not allow query parameters.
+        )
+        logging.info(f"Retrieved {len(df)} records")
+    except Exception as e:
+        return generate_exit_error(
+            500, f"Error getting data from AWS Timestream: {e}", context.aws_request_id
+        )
 
     df = general_transformations(df)
 
