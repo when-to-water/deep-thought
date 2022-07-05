@@ -47,3 +47,17 @@ jobs:
           tags: |
             ghcr.io/${{ github.REPOSITORY_OWNER }}/deep-thought:latest
             ${{ secrets.AWS_LAMBDA_ECR }}:latest
+
+  update_lambda:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - name: Set AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Update AWS Lambda
+        run: aws lambda update-function-code --function-name deep-thought --image-uri ${{ secrets.AWS_LAMBDA_ECR }}:latest
