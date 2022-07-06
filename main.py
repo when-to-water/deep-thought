@@ -72,6 +72,10 @@ def lambda_handler(
             (df["plant"] == plant) & (df["time"] == newest_times[plant])
         ]["soil moisture in %"].iloc[0]
 
+    last_week_moistures: dict[str, tuple[float, ...]] = get_last_week_moistures(
+        df, wanted_plants
+    )
+
     df = identify_valleys_peaks(df, newest_times)
 
     df = remove_ascends(df)
@@ -80,10 +84,6 @@ def lambda_handler(
 
     next_watering: dict[str, tuple[float, float]] = calc_next_watering(
         min_moistures, newest_moistures, polyfits, newest_times
-    )
-
-    last_week_moistures: dict[str, tuple[float, ...]] = get_last_week_moistures(
-        df, wanted_plants
     )
 
     return_dict: dict[str, dict[str, Any]] = {}
