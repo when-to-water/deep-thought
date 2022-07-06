@@ -72,18 +72,22 @@ def lambda_handler(
             (df["plant"] == plant) & (df["time"] == newest_times[plant])
         ]["soil moisture in %"].iloc[0]
 
+    last_week_moistures: dict[str, tuple[float, ...]] = get_last_week_moistures(
+        df, wanted_plants
+    )
+
     df = identify_valleys_peaks(df, newest_times)
 
     df = remove_ascends(df)
 
     polyfits: dict[str, Polynomial] = fit(df, wanted_plants)
 
-    next_watering: dict[str, tuple[float, float]] = calc_next_watering(
-        min_moistures, newest_moistures, polyfits, newest_times
+    predicted_moisture: dict[str, float] = predict_moisture(
+        wanted_plants, polyfits, newest_moistures, newest_times
     )
 
-    last_week_moistures: dict[str, tuple[float, ...]] = get_last_week_moistures(
-        df, wanted_plants
+    next_watering: dict[str, float] = calc_next_watering(
+        min_moistures, newest_moistures, polyfits, newest_times
     )
 
     return_dict: dict[str, dict[str, Any]] = {}
@@ -95,6 +99,7 @@ def lambda_handler(
                 // pd.Timedelta("1s"),  # recommended by pandas
                 "value": newest_moistures[plant],
             },
+            "predicted_moisture": predicted_moisture[plant],
             "next_watering": next_watering[plant],
             "last_week_moistures": last_week_moistures[plant],
         }
@@ -258,6 +263,19 @@ def fit(df: pd.DataFrame, wanted_plants: tuple[str, ...]) -> dict[str, Polynomia
     return polyfits
 
 
+def predict_moisture(
+    wanted_plants: tuple[str, ...],
+    polyfits: dict[str, Polynomial],
+    newest_moistures: dict[str, float],
+    newest_times: dict[str, pd.Timestamp],
+) -> dict[str, float]:
+    predicted_moistures: dict[str, float] = {}
+    for plant in wanted_plants:
+        timediff = (datetime.datetime.now() - newest_times[plant]).total_seconds() / 3600 / 24
+        predicted_moistures[plant] = newest_moistures[plant] - ((polyfits[plant](0) - polyfits[plant](1)) * timediff)
+    return predicted_moistures
+
+
 def prep_input(input_dict: dict[str, int]) -> dict[str, int]:
     input_dict = dict(
         (key.capitalize(), int(value)) for (key, value) in input_dict.items()
@@ -281,7 +299,7 @@ def calc_next_watering(
     newest_moistures: dict[str, float],
     polyfits: dict[str, Polynomial],
     newest_times: dict[str, pd.Timestamp],
-) -> dict[str, tuple[float, float]]:
+) -> dict[str, float]:
     watering_days = {}
     for plant in min_moistures.keys():
         newest_moisture = newest_moistures[plant]
@@ -291,7 +309,7 @@ def calc_next_watering(
         days_after_now = days_after_last_measurement - (
             (datetime.datetime.now() - newest_times[plant]).total_seconds() / 3600 / 24
         )
-        watering_days[plant] = (days_after_last_measurement, days_after_now)
+        watering_days[plant] = days_after_now
     return watering_days
 
 
@@ -302,7 +320,7 @@ def get_last_week_moistures(
     df = df.copy()
     df = df[df["time"] > datetime.datetime.now() - datetime.timedelta(days=7)]
     df.set_index("time", inplace=True)
-    df = df.groupby(["plant"]).resample("D").median().reset_index()
+    df = df.groupby(["plant"]).resample("D").mean().reset_index()
     for plant in wanted_plants:
         last_week_moistures[plant] = tuple(
             df[df["plant"] == plant]["soil moisture in %"]
