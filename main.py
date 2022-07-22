@@ -6,7 +6,8 @@ from typing import Any
 import awswrangler as wr
 import pandas as pd
 import scipy.signal as signal
-from aws_lambda_typing import context as context_, events
+from aws_lambda_typing import context as context_
+from aws_lambda_typing import events
 from dotenv import load_dotenv
 from numpy.polynomial import Polynomial
 
@@ -32,8 +33,6 @@ def lambda_handler(
     body = event.get("body")
     if body is None:
         return generate_exit_error(400, "No body in request", context.aws_request_id)
-    else:
-        assert isinstance(body, str)  # nosec: B101
 
     try:
         min_moistures = prep_input(json.loads(body))
