@@ -318,8 +318,12 @@ def get_last_week_moistures(
     last_week_moistures = {}
     df = df.copy()
     df = df[df["time"] > datetime.datetime.now() - datetime.timedelta(days=7)]
+    if df.empty:
+        for plant in wanted_plants:
+            last_week_moistures[plant] = tuple()
+        return last_week_moistures
     df.set_index("time", inplace=True)
-    df = df.groupby(["plant"]).resample("D").mean()
+    df = df.groupby(["plant"]).resample("D").mean().reset_index()
     for plant in wanted_plants:
         last_week_moistures[plant] = tuple(
             df[df["plant"] == plant]["soil moisture in %"]
