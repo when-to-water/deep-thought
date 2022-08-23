@@ -54,7 +54,7 @@ def lambda_handler(
     try:
         df: pd.DataFrame = wr.timestream.query(
             f'SELECT * FROM "when-to-water"."sensor-data" WHERE "sensor_name" in ({sensor_filter})'  # nosec: query is safe. awswrangler does not allow query parameters.
-        )
+        )  # type: ignore
         logging.info(f"Retrieved {len(df)} records")
     except Exception as e:
         return generate_exit_error(
@@ -158,7 +158,7 @@ def general_transformations(df: pd.DataFrame) -> pd.DataFrame:
 
     # Resample df to hourly measures
     df.set_index("time", inplace=True)
-    df = df.groupby(["plant", "measure_name"]).resample("H").mean().reset_index()
+    df = df.groupby(["plant", "measure_name"]).resample("H").mean().reset_index()  # type: ignore
 
     df.set_index(["time", "plant", "measure_name"], inplace=True)
     df = df.unstack().reset_index()
@@ -280,11 +280,10 @@ def prep_input(input_dict: dict[str, int]) -> dict[str, int]:
         (key.capitalize(), int(value)) for (key, value) in input_dict.items()
     )
 
-    for key in input_dict.keys():
+    for key, value in input_dict.items():
         if key not in PLANTS:
             raise (ValueError(f'"{key}" is not a plant we know.'))
 
-    for value in input_dict.values():
         if not (1 <= value <= 100):
             raise (
                 ValueError(f'Minimum moisture of "{value}" % is not allowed for {key}.')
@@ -315,7 +314,7 @@ def calc_next_watering(
 def get_last_week_moistures(
     df: pd.DataFrame, wanted_plants: tuple[str, ...]
 ) -> dict[str, tuple[float, ...]]:
-    last_week_moistures = {}
+    last_week_moistures: dict[str, tuple[float, ...]] = {}
     df = df.copy()
     df = df[df["time"] > datetime.datetime.now() - datetime.timedelta(days=7)]
     if df.empty:
@@ -323,7 +322,7 @@ def get_last_week_moistures(
             last_week_moistures[plant] = tuple()
         return last_week_moistures
     df.set_index("time", inplace=True)
-    df = df.groupby(["plant"]).resample("D").mean().reset_index()
+    df = df.groupby(["plant"]).resample("D").mean().reset_index()  # type: ignore
     for plant in wanted_plants:
         last_week_moistures[plant] = tuple(
             df[df["plant"] == plant]["soil moisture in %"]
